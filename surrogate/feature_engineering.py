@@ -1,25 +1,41 @@
 import pandas as pd
 import numpy as np
 import torch
-from ..physics.ode_fitting import fit_shot_parameters
-from ..physics.trajectory import integrate_trajectory
-from ..physics.wind import estimate_session_winds
+try:
+    from physics.ode_fitting import fit_shot_parameters
+    from physics.trajectory import integrate_trajectory
+    from physics.wind import estimate_session_winds
+except ImportError:
+    from ..physics.ode_fitting import fit_shot_parameters
+    from ..physics.trajectory import integrate_trajectory
+    from ..physics.wind import estimate_session_winds
 
 def extract_raw_features(df):
     df = df.copy()
     
     df['speed_launch'] = np.sqrt(df.launch_vx**2 + df.launch_vy**2 + df.launch_vz**2)
     df['launch_angle_v'] = np.degrees(np.arctan2(df.launch_vz, np.sqrt(df.launch_vx**2 + df.launch_vy**2)))
+    # Launch azimuth relative to the 25.1 degree range centerline
+    df['launch_azimuth'] = np.degrees(np.arctan2(df.launch_vy, df.launch_vx)) - 25.1
+    # Kinetic dynamic pressure proxy
+    df['v_squared'] = df.launch_vx**2 + df.launch_vy**2 + df.launch_vz**2
+    # Theoretical zero-drag time to apex
+    df['t_apex_ballistic'] = df.launch_vz / 9.81
     
     df['vx_cp12'] = (df.cp2_x - df.cp1_x) / (df.cp2_t - df.cp1_t)
     df['vy_cp12'] = (df.cp2_y - df.cp1_y) / (df.cp2_t - df.cp1_t)
     df['vz_cp12'] = (df.cp2_z - df.cp1_z) / (df.cp2_t - df.cp1_t)
     df['speed_cp12'] = np.sqrt(df.vx_cp12**2 + df.vy_cp12**2 + df.vz_cp12**2)
+    df['azimuth_cp12'] = np.degrees(np.arctan2(df.vy_cp12, df.vx_cp12)) - 25.1
     
     df['vx_cp34'] = (df.cp4_x - df.cp3_x) / (df.cp4_t - df.cp3_t)
     df['vy_cp34'] = (df.cp4_y - df.cp3_y) / (df.cp4_t - df.cp3_t)
     df['vz_cp34'] = (df.cp4_z - df.cp3_z) / (df.cp4_t - df.cp3_t)
     df['speed_cp34'] = np.sqrt(df.vx_cp34**2 + df.vy_cp34**2 + df.vz_cp34**2)
+    df['azimuth_cp34'] = np.degrees(np.arctan2(df.vy_cp34, df.vx_cp34)) - 25.1
+    
+    # Horizontal curvature rate between early and late radar checkpoints
+    df['azimuth_curve'] = df['azimuth_cp34'] - df['azimuth_cp12']
     
     df['decel_rate'] = (df.speed_launch - df.speed_cp34) / df.cp4_t
     
@@ -87,6 +103,7 @@ def generate_physics_priors(train_df, test_df=None):
 def build_feature_tensor(df, priors_df, scaler=None):
     feature_cols = [
         'launch_vx', 'launch_vy', 'launch_vz', 'speed_launch', 'launch_angle_v',
+        'launch_azimuth', 'v_squared', 't_apex_ballistic', 'azimuth_curve',
         'speed_cp12', 'speed_cp34', 'decel_rate', 'lift_residual',
         'bay_0', 'bay_1', 'bay_2', 'bay_3',
         'ode_apex_t', 'ode_apex_x', 'ode_apex_y', 'ode_apex_z',

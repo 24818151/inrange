@@ -20,11 +20,12 @@ The solution uses a hybrid **Physics-Informed Gaussian Process (GPR)** approach 
 ## 📂 Repository Structure
 
 * `app.py` - Streamlit interactive physics dashboard with 3D Plotly animations.
-* `requirements.txt` - Python dependencies for the cloud environment.
+* `requirements.txt` - Python dependencies for the cloud environment and ML pipeline.
 * `physics/` - The core ODE physics engine, trajectory integrators, and wind estimators.
 * `surrogate/` - GPyTorch models, custom Mean modules, and feature engineering.
 * `pipelines/` - Execution scripts for 5-Fold Cross Validation and final Kaggle submission generation.
-* `analysis/` - Trajectory visualization and EDA tools.
+* `analysis/` - Trajectory visualization, EDA tools, and figure exporter (`export_figures.py`).
+* `assets/` - Publication-ready high-DPI figures for the competition writeup report.
 
 ## 🚀 Getting Started
 

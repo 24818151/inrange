@@ -1,18 +1,32 @@
+import sys
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import torch
 import time
-import sys
-sys.path.insert(0, r'C:\GitHub\Mode-Matching\Python')
 
-from inrange.surrogate.feature_engineering import extract_raw_features, generate_physics_priors, build_feature_tensor
-from inrange.surrogate.botorch_gpr import build_independent_gps, fit_mll, predict
+# Ensure repository root is on sys.path for direct imports
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from surrogate.feature_engineering import extract_raw_features, generate_physics_priors, build_feature_tensor
+from surrogate.botorch_gpr import build_independent_gps, fit_mll, predict
 
 def generate_submission():
+    # Set seeds for deterministic reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+
     print("Loading data...")
-    train_df = pd.read_csv(r'C:\GitHub\Mode-Matching\Python\inrange\train.csv')
-    test_df = pd.read_csv(r'C:\GitHub\Mode-Matching\Python\inrange\test.csv')
-    sample_sub = pd.read_csv(r'C:\GitHub\Mode-Matching\Python\inrange\sample_submission.csv')
+    train_path = ROOT_DIR / 'train.csv'
+    test_path = ROOT_DIR / 'test.csv'
+    sample_sub_path = ROOT_DIR / 'sample_submission.csv'
+    out_path = ROOT_DIR / 'submission.csv'
+
+    train_df = pd.read_csv(train_path)
+    test_df = pd.read_csv(test_path)
+    sample_sub = pd.read_csv(sample_sub_path)
     
     print("Extracting features (Train/Test)...")
     train_feat = extract_raw_features(train_df)
@@ -47,9 +61,14 @@ def generate_submission():
     for i, col in enumerate(target_cols):
         submission[col] = preds[:, i]
         
-    out_path = r'C:\GitHub\Mode-Matching\Python\inrange\submission.csv'
     submission.to_csv(out_path, index=False)
     print(f"Success! Saved to {out_path}")
+
+    # Physical assertion checks
+    assert submission.shape == sample_sub.shape
+    assert list(submission.columns) == list(sample_sub.columns)
+    assert submission.isnull().sum().sum() == 0
+    print("Schema and integrity checks passed.")
 
 if __name__ == '__main__':
     generate_submission()

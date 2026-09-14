@@ -38,9 +38,9 @@ def estimate_session_winds(train_df, test_df=None):
                   row.launch_vx, row.launch_vy, row.launch_vz]
             traj = integrate_trajectory(y0, cd, cl0, wx=0.0, wy=0.0, max_time=row.cp4_t)
             
-            # Extract prediction at cp4
-            t_eval = row.cp4_t
+            # Extract prediction at cp4 (guarded against early stopping)
             sol = traj['sol']
+            t_eval = min(row.cp4_t, sol.t[-1])
             pos_cp4 = sol.sol(t_eval)
             
             err_x = row.cp4_x - pos_cp4[0]

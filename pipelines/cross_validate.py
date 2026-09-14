@@ -1,21 +1,30 @@
+import sys
+from pathlib import Path
 import pandas as pd
 import numpy as np
 import torch
 from sklearn.model_selection import KFold
 import time
-import sys
-sys.path.insert(0, r'C:\GitHub\Mode-Matching\Python')
 
-from inrange.surrogate.feature_engineering import extract_raw_features, generate_physics_priors, build_feature_tensor
-from inrange.surrogate.botorch_gpr import build_independent_gps, fit_mll, predict
+# Ensure repository root is on sys.path for direct imports
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from surrogate.feature_engineering import extract_raw_features, generate_physics_priors, build_feature_tensor
+from surrogate.botorch_gpr import build_independent_gps, fit_mll, predict
 
 def run_cv():
+    torch.manual_seed(42)
+    np.random.seed(42)
+
     print("Loading data...")
-    train_df = pd.read_csv(r'C:\GitHub\Mode-Matching\Python\inrange\train.csv')
+    train_path = ROOT_DIR / 'train.csv'
+    train_df = pd.read_csv(train_path)
     
     print("Extracting features and generating physics priors with session wind (takes ~30s)...")
     feat_df = extract_raw_features(train_df)
-    priors_df = generate_physics_priors(train_df) # No test_df for strict CV
+    priors_df = generate_physics_priors(train_df)
     
     target_cols = ['launch_spin_rate', 'apex_t', 'apex_x', 'apex_y', 'apex_z', 
                    'landing_t', 'landing_x', 'landing_y', 'landing_z']

@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
-
-train = pd.read_csv(r'C:\GitHub\Mode-Matching\Python\inrange\train.csv')
+from pathlib import Path
+ROOT_DIR = Path(__file__).resolve().parent
+train = pd.read_csv(ROOT_DIR / 'train.csv')
 
 # cp4 IS the net boundary - 60m downrange.
 # The ball is still rising when it crosses the net - apex is BEYOND the observable zone.
