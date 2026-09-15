@@ -19,8 +19,10 @@ st.set_page_config(page_title="Inrange Golf Physics Simulator", layout="wide")
 st.title("⛳ Inrange Golf: Physics-Informed 3D Trajectory & Bounce Simulator")
 st.markdown("""
 Interactive physics simulator for the **Inrange Student Competition** (Kaggle). 
-This tool models 3D aerodynamic flight (drag, Magnus backspin lift, ambient wind) up to the 60 m net, 
-and extrapolates full flight to apex, level landing, and post-impact bounce & roll.
+
+*Note: To remain lightweight for web hosting, this dashboard bypasses the heavy PyTorch/GPR machine learning dependencies. It runs **only** the Phase 1 deterministic aerodynamic ODE inverse solver. This intentionally isolates and demonstrates the raw strength of the structural physics prior before the Cascaded GPR corrects the final residuals.*
+
+This tool models 3D aerodynamic flight (drag, Magnus backspin lift, ambient wind) up to the 60m net, and extrapolates the full flight to apex, level landing, and simulated post-impact bounce & roll.
 """)
 
 # Load dataset for inspection if available

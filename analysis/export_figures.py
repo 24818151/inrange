@@ -200,8 +200,8 @@ def generate_fig6_cv_performance():
     print("Generating Figure 6: CV Benchmark Results...")
     targets = ['apex_t (s)', 'apex_x (m)', 'apex_y (m)', 'apex_z (m)', 
                'landing_t (s)', 'landing_x (m)', 'landing_y (m)', 'landing_z (m)']
-    rmse_vals = [0.13, 4.69, 4.61, 0.86, 0.22, 8.16, 11.03, 0.09]
-    mae_vals =  [0.07, 2.78, 3.10, 0.38, 0.13, 4.94, 7.81, 0.08]
+    rmse_vals = [0.12, 3.39, 2.26, 1.14, 0.21, 4.46, 4.90, 0.09]
+    mae_vals =  [0.07, 1.98, 1.36, 0.57, 0.13, 2.79, 3.14, 0.08]
     
     x = np.arange(len(targets))
     width = 0.38
