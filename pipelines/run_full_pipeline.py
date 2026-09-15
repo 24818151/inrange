@@ -114,7 +114,7 @@ def generate_submission(num_restarts: int = 20):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description="Run the full 2-Stage Cascaded GPR pipeline.")
-    parser.add_argument('--restarts', type=int, default=20, help="Number of restarts for the L-BFGS-B GPR multi-start optimization (default: 20).")
+    parser.add_argument('--restarts', type=int, default=3, help="Number of restarts for the L-BFGS-B GPR multi-start optimization (default: 20).")
     args = parser.parse_args()
     
     generate_submission(num_restarts=args.restarts)

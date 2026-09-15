@@ -167,6 +167,36 @@ fig.add_trace(go.Surface(
     name='60m Net Plane'
 ))
 
+# --- Animation Configuration ---
+anim_x = np.concatenate([fx, bx])
+anim_y = np.concatenate([fy, by])
+anim_z = np.concatenate([fz, bz])
+
+# Add the golf ball marker trace
+fig.add_trace(go.Scatter3d(
+    x=[anim_x[0]], y=[anim_y[0]], z=[anim_z[0]],
+    mode='markers',
+    name='Golf Ball (Animated)',
+    marker=dict(size=7, color='white', line=dict(color='black', width=2))
+))
+ball_trace_index = len(fig.data) - 1
+
+# Generate frames
+frames = []
+step = max(1, len(anim_x) // 60) # ~60 frames for smooth browser playback
+for i in range(0, len(anim_x), step):
+    frames.append(go.Frame(
+        data=[go.Scatter3d(x=[anim_x[i]], y=[anim_y[i]], z=[anim_z[i]])],
+        name=f'frame{i}',
+        traces=[ball_trace_index]
+    ))
+frames.append(go.Frame(
+    data=[go.Scatter3d(x=[anim_x[-1]], y=[anim_y[-1]], z=[anim_z[-1]])],
+    name='final',
+    traces=[ball_trace_index]
+))
+fig.frames = frames
+
 # Layout configurations
 fig.update_layout(
     scene=dict(
@@ -176,7 +206,21 @@ fig.update_layout(
         zaxis_title='Height Z (m)'
     ),
     margin=dict(l=0, r=0, b=0, t=0),
-    legend=dict(yanchor="top", y=0.95, xanchor="left", x=0.05)
+    legend=dict(yanchor="top", y=0.95, xanchor="left", x=0.05),
+    updatemenus=[dict(
+        type="buttons",
+        showactive=False,
+        x=0.05, y=0.05,
+        xanchor="left", yanchor="bottom",
+        buttons=[
+            dict(label="▶ Play Flight",
+                 method="animate",
+                 args=[None, {"frame": {"duration": 40, "redraw": True}, "fromcurrent": True, "mode": "immediate"}]),
+            dict(label="⏸ Pause",
+                 method="animate",
+                 args=[[None], {"frame": {"duration": 0, "redraw": False}, "mode": "immediate", "transition": {"duration": 0}}])
+        ]
+    )]
 )
 
 st.plotly_chart(fig, use_container_width=True, height=650)
