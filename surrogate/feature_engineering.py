@@ -124,3 +124,45 @@ def build_feature_tensor(df, priors_df, scaler=None):
         
     X_norm = (X_raw - scaler['min']) / scaler['ptp']
     return torch.tensor(X_norm, dtype=torch.float64), scaler
+
+def build_cascaded_stage2_tensor(X_base_norm, stage1_preds, scaler_base, scaler_stage2=None):
+    """
+    Constructs the augmented feature tensor for Stage 2 (landing targets)
+    by combining the normalized Stage 1 base features with the Stage 1 predicted apex/spin state.
+    """
+    # stage1_preds: [spin, apex_t, apex_x, apex_y, apex_z]
+    spin = stage1_preds[:, 0:1]
+    apex_t = stage1_preds[:, 1:2]
+    apex_x = stage1_preds[:, 2:3]
+    apex_y = stage1_preds[:, 3:4]
+    apex_z = stage1_preds[:, 4:5]
+    
+    angle_rad = np.radians(25.1)
+    apex_downrange = apex_x * np.cos(angle_rad) + apex_y * np.sin(angle_rad)
+    descent_time = np.sqrt(np.maximum(0.05, apex_z) * 2.0 / 9.81)
+    landing_time_proxy = apex_t + descent_time
+    
+    stage2_raw = np.hstack([
+        spin, apex_t, apex_x, apex_y, apex_z,
+        apex_downrange, descent_time, landing_time_proxy
+    ])
+    
+    stage2_cols = [
+        'pred_spin', 'pred_apex_t', 'pred_apex_x', 'pred_apex_y', 'pred_apex_z',
+        'pred_apex_downrange', 'pred_descent_time', 'pred_landing_time_proxy'
+    ]
+    
+    if scaler_stage2 is None:
+        s_min = stage2_raw.min(axis=0)
+        s_max = stage2_raw.max(axis=0)
+        ptp = s_max - s_min
+        ptp[ptp == 0] = 1.0
+        scaler_stage2 = {'min': s_min, 'ptp': ptp, 'cols': stage2_cols}
+        
+    stage2_norm = (stage2_raw - scaler_stage2['min']) / scaler_stage2['ptp']
+    X_base_np = X_base_norm.detach().cpu().numpy() if isinstance(X_base_norm, torch.Tensor) else X_base_norm
+    X_combined = np.hstack([X_base_np, stage2_norm])
+    
+    all_cols = scaler_base['cols'] + scaler_stage2['cols']
+    return torch.tensor(X_combined, dtype=torch.float64), scaler_stage2, all_cols
+

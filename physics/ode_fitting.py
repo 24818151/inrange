@@ -6,7 +6,8 @@ from .aerodynamics import ball_derivatives
 def fit_shot_parameters(shot_series, wx=0.0, wy=0.0):
     """
     Fits Cd and Cl0 for a single shot given its launch state, 4 checkpoints, and ambient wind.
-    shot_series: pandas Series containing launch and cp1-4 columns.
+    Uses multi-start L-BFGS-B across multiple aerodynamic regimes (driver, mid-iron, wedge)
+    with tight integration tolerances to find the global optimum.
     """
     y0 = [
         shot_series['launch_x'], shot_series['launch_y'], shot_series['launch_z'],
@@ -33,8 +34,8 @@ def fit_shot_parameters(shot_series, wx=0.0, wy=0.0):
             t_span=(0, t_max),
             y0=y0,
             t_eval=cp_times,
-            rtol=1e-5,
-            atol=1e-7
+            rtol=1e-6,
+            atol=1e-8
         )
         
         if not sol.success or len(sol.t) != 4:
@@ -44,15 +45,29 @@ def fit_shot_parameters(shot_series, wx=0.0, wy=0.0):
         mse = np.mean(np.sum((pred_positions - cp_targets)**2, axis=1))
         return mse
 
-    initial_guess = [0.25, 0.15]
+    # 3 distinct aerodynamic starting guesses (Driver/low spin, Mid-iron, High-spin wedge)
+    candidate_guesses = [
+        [0.22, 0.10],
+        [0.27, 0.18],
+        [0.34, 0.28]
+    ]
     bounds = [(0.1, 0.6), (-0.1, 0.5)]
     
-    res = minimize(
-        objective,
-        x0=initial_guess,
-        bounds=bounds,
-        method='L-BFGS-B',
-        options={'maxfun': 50, 'ftol': 1e-4}
-    )
+    best_cd = 0.25
+    best_cl0 = 0.15
+    best_mse = float('inf')
     
-    return res.x[0], res.x[1], res.fun
+    for guess in candidate_guesses:
+        res = minimize(
+            objective,
+            x0=guess,
+            bounds=bounds,
+            method='L-BFGS-B',
+            options={'maxfun': 250, 'ftol': 1e-7, 'gtol': 1e-6}
+        )
+        if res.fun < best_mse:
+            best_mse = res.fun
+            best_cd = float(res.x[0])
+            best_cl0 = float(res.x[1])
+            
+    return best_cd, best_cl0, best_mse

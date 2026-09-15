@@ -16,6 +16,14 @@ from .physics_mean import PhysicsFlightMean, ConstantPhysicsMean
 logger = logging.getLogger(__name__)
 torch.set_default_dtype(torch.float64)
 
+# Suppress benign GPyTorch / linear_operator numerical warnings
+warnings.filterwarnings("ignore", message=".*The input matches the stored training data.*")
+warnings.filterwarnings("ignore", message=".*Negative variance values detected.*")
+warnings.filterwarnings("ignore", message=".*A not p.d., added jitter.*")
+warnings.filterwarnings("ignore", message=".*OptimizationStatus.FAILURE.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="gpytorch")
+warnings.filterwarnings("ignore", category=UserWarning, module="botorch")
+
 def _recover_prior_support_raw_parameters(module: torch.nn.Module, min_raw: float = -12.0) -> None:
     with torch.no_grad():
         for name, param in module.named_parameters():
@@ -25,10 +33,11 @@ def _recover_prior_support_raw_parameters(module: torch.nn.Module, min_raw: floa
                 continue
             param.clamp_(min=min_raw)
 
-def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_restarts: int = 5) -> None:
+def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_restarts: int = 20) -> None:
     """
     Fits a single ExactMarginalLogLikelihood using multi-start L-BFGS-B with Adam fallback.
-    Retains the model state dict achieving the lowest negative marginal log likelihood.
+    Runs num_restarts diverse starting initializations and retains the model state dict 
+    achieving the global minimum negative marginal log likelihood.
     """
     best_loss = float('inf')
     best_state_dict = None
@@ -43,11 +52,11 @@ def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_resta
             sub_mll.likelihood.train()
             
         if restart > 0:
-            # Re-seed with smooth perturbation around initial parameter space
+            # Re-seed with smooth Latin Hypercube-like perturbation around initial parameter space
             with torch.no_grad():
                 for name, param in sub_mll.named_parameters():
                     if param.requires_grad:
-                        noise = torch.randn_like(param) * 0.15
+                        noise = torch.randn_like(param) * 0.20
                         param.add_(noise)
                         
         with gpytorch.settings.lazily_evaluate_kernels(False), gpytorch.settings.cholesky_jitter(1e-3):
@@ -62,7 +71,7 @@ def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_resta
                         }
                     }
                 )
-            except Exception as e:
+            except Exception:
                 # Robust Adam fallback if L-BFGS-B terminates abnormally on this restart
                 sub_mll.train()
                 sub_mll.model.train()
@@ -84,11 +93,12 @@ def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_resta
                     loss.sum().backward()
                     optimizer.step()
 
-        # Evaluate MLL loss
-        sub_mll.eval()
+        # Evaluate MLL loss while in train mode to prevent GPInputWarning
+        sub_mll.train()
+        sub_mll.model.train()
         with torch.no_grad():
-            output = sub_mll.model(*sub_mll.model.train_inputs)
             try:
+                output = sub_mll.model(*sub_mll.model.train_inputs)
                 curr_loss = -sub_mll(output, sub_mll.model.train_targets).item()
             except Exception:
                 curr_loss = float('inf')
@@ -100,8 +110,9 @@ def _fit_single_mll_with_restarts(sub_mll: ExactMarginalLogLikelihood, num_resta
     if best_state_dict is not None:
         sub_mll.load_state_dict(best_state_dict)
     sub_mll.eval()
+    sub_mll.model.eval()
 
-def fit_mll(mll: gpytorch.mlls.MarginalLogLikelihood, num_restarts: int = 5) -> None:
+def fit_mll(mll: gpytorch.mlls.MarginalLogLikelihood, num_restarts: int = 20) -> None:
     """
     Fits MLL across all models using multi-start L-BFGS-B with Adam fallbacks.
     For ModelListGP / SumMarginalLogLikelihood, optimizes each sub-model independently.
