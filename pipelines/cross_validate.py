@@ -102,4 +102,9 @@ def run_cv(num_restarts: int = 20):
     print(f"\nApproximate Composite Score (Mean Scaled RMSE): {np.mean(scaled_rmse):.4f}")
 
 if __name__ == '__main__':
-    run_cv(num_restarts=20)
+    import argparse
+    parser = argparse.ArgumentParser(description="Run 5-Fold Cross Validation for the Cascaded GPR.")
+    parser.add_argument('--restarts', type=int, default=20, help="Number of restarts for the L-BFGS-B GPR multi-start optimization (default: 20).")
+    args = parser.parse_args()
+    
+    run_cv(num_restarts=args.restarts)

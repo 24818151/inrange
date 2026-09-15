@@ -227,6 +227,70 @@ def generate_fig6_cv_performance():
     plt.close(fig)
     print(f"Saved: {out}")
 
+def generate_fig7_gpr_uncertainty(train_df):
+    print("Generating Figure 7: GPR Uncertainty and Prior Correction (takes ~20s)...")
+    import torch
+    from surrogate.feature_engineering import extract_raw_features, generate_physics_priors, build_feature_tensor
+    from surrogate.botorch_gpr import build_independent_gps, fit_mll, predict
+    
+    # Subsample to make plotting fast (100 train, 30 test)
+    df_sub = train_df.sample(130, random_state=42)
+    train_sub = df_sub.iloc[:100]
+    test_sub = df_sub.iloc[100:]
+    
+    feat_train = extract_raw_features(train_sub)
+    feat_test = extract_raw_features(test_sub)
+    prior_train, prior_test = generate_physics_priors(train_sub, test_sub)
+    
+    target = 'landing_y'
+    
+    X_train, scaler = build_feature_tensor(feat_train, prior_train)
+    X_test, _ = build_feature_tensor(feat_test, prior_test, scaler)
+    
+    Y_train = torch.tensor(train_sub[[target]].values, dtype=torch.float64)
+    Y_test = test_sub[target].values
+    
+    model, mll = build_independent_gps(X_train, Y_train, scaler['cols'], [target])
+    fit_mll(mll, num_restarts=3)
+    
+    mean, var = predict(model, X_test)
+    mean = mean.numpy().flatten()
+    std = np.sqrt(var.numpy()).flatten()
+    
+    ode_prior = prior_test['ode_landing_y'].values
+    
+    sort_idx = np.argsort(Y_test)
+    Y_test_sorted = Y_test[sort_idx]
+    mean_sorted = mean[sort_idx]
+    std_sorted = std[sort_idx]
+    ode_sorted = ode_prior[sort_idx]
+    
+    fig, ax = plt.subplots(figsize=(10, 6))
+    x = np.arange(len(Y_test))
+    
+    ax.plot(x, mean_sorted, color='#1f77b4', linewidth=2, label='GPR Posterior Mean')
+    ax.fill_between(x, mean_sorted - 1.96*std_sorted, mean_sorted + 1.96*std_sorted, 
+                    color='#1f77b4', alpha=0.25, label='95% Predictive Confidence Interval')
+                    
+    ax.scatter(x, ode_sorted, color='#d62728', alpha=0.7, marker='x', s=60, label='Deterministic ODE Prior')
+    ax.scatter(x, Y_test_sorted, color='black', s=50, zorder=5, label='True Recorded Landing Y')
+    
+    # Connect ODE prior to GP posterior to show the "correction"
+    for i in range(len(x)):
+        ax.plot([x[i], x[i]], [ode_sorted[i], mean_sorted[i]], color='gray', linestyle=':', alpha=0.5)
+        
+    ax.set_title('Figure 7: GPR Posterior Uncertainty vs Deterministic ODE Prior (Lateral Dispersion)', fontsize=13, fontweight='bold')
+    ax.set_xlabel('Out-of-Sample Test Shots (Sorted by True Lateral Dispersion)', fontsize=11)
+    ax.set_ylabel('Landing Y Coordinate (metres)', fontsize=11)
+    ax.legend(frameon=True, facecolor='white', loc='upper left')
+    ax.grid(True, linestyle='--', alpha=0.5)
+    
+    fig.tight_layout()
+    out = ASSETS_DIR / 'fig7_gpr_uncertainty.png'
+    fig.savefig(out, dpi=300)
+    plt.close(fig)
+    print(f"Saved: {out}")
+
 if __name__ == '__main__':
     train_df = pd.read_csv(ROOT_DIR / 'train.csv')
     generate_fig1_speed_decay(train_df)
@@ -235,4 +299,5 @@ if __name__ == '__main__':
     generate_fig4_ode_fit_quality(train_df)
     generate_fig5_3d_trajectory(train_df)
     generate_fig6_cv_performance()
+    generate_fig7_gpr_uncertainty(train_df)
     print("All figures successfully exported to assets/ folder!")

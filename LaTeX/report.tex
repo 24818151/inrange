@@ -106,6 +106,16 @@ Rather than using a standard zero-mean GP, I implemented a custom \texttt{Physic
 This allows the Linear kernel to handle global kinematic scaling, while the Matérn-5/2 kernel models local, non-linear aerodynamic perturbations. I enforced strict Gamma priors on the lengthscales to aggressively regularise the model and prevent overfitting on the 491-shot dataset. 
 I utilised a 20-restart multi-start optimiser with Adam fallbacks to guarantee global convergence of the Marginal Log-Likelihood (MLL).
 
+
+Figure \ref{fig:gpr} visually demonstrates this Bayesian correction in action for lateral landing dispersion. It highlights the deterministic prior, the corrected posterior mean, and the 95\% epistemic confidence intervals enveloping the true values.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.85\textwidth]{fig7_gpr_uncertainty.png}
+    \caption{GPR Posterior Uncertainty vs Deterministic ODE Prior for Lateral Dispersion.}
+    \label{fig:gpr}
+\end{figure}
+
 \subsubsection{Cascaded Architecture}
 Predicting the landing coordinates directly from launch is a severe extrapolation task. To solve this, I implemented a \textbf{Cascaded 2-Stage GPR}:
 \begin{itemize}
